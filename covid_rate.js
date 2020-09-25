@@ -2,6 +2,7 @@
 
 var parseTime = d3.timeParse("%Y-%m-%d");
 var selMetric = 'actual';
+var contFilter = ''; // not implemented but continent filter in future
 
 d3.csv("owid-covid-data.csv", function(d) {
     return {
@@ -13,7 +14,123 @@ d3.csv("owid-covid-data.csv", function(d) {
         };
 }).then(function getData(rawData) {
 
+    // filter rawData past 7 days
+    var maxAvailDate = d3.max(rawData.map(d=>d.date));
+    var cutOffDate = new Date();
+    cutOffDate.setDate(maxAvailDate.getDate() - 7);
+    if(contFilter == '') {
+        filteredData = rawData.filter(function(d) {
+            return d.date > cutOffDate && d.location !== 'International';
+        })
+    } else {
+        filteredData = rawData.filter(function(d) {
+            return d.date > cutOffDate && d.location !== 'International' && d.continent == contFilter;
+        })
+    }
+
+    // filter rawData past 14 to 7 days (from maxAvailDate - 14 to maxAvailDate - 7)
+    var cutOffDate14days = new Date();
+    cutOffDate14days.setDate(maxAvailDate.getDate() - 14);
+    if(contFilter == '') {
+        filteredDataPast = rawData.filter(function(d) {
+            return d.date > cutOffDate14days &&  d.date < cutOffDate && d.location !== 'International';
+        })
+    } else {
+        filteredDataPast = rawData.filter(function(d) {
+            return d.date > cutOffDate14days && d.date < cutOffDate !== 'International' && d.continent == contFilter;
+        })
+    }
+
+    // get min and max date to write to index
+    //minDatePast = d3.min(filteredDataPast.map(d=>d.date));
+    //maxDatePast = d3.max(filteredDataPast.map(d=>d.date));
+
+    // get min and max date to write to index
+    minDate = d3.min(filteredData.map(d=>d.date));
+    maxDate = d3.max(filteredData.map(d=>d.date));
+    document.getElementById("min_date").innerHTML += minDate.toISOString().split("T")[0];
+    document.getElementById("max_date").innerHTML += maxDate.toISOString().split("T")[0];
+
+    // group filteredData by location and mean values
+    var dataCurr = d3.nest()
+    .key(function(d) { return d.location; })
+    .rollup(function(v) { 
+        return {
+            avg_new_cases: d3.mean(v, function(d) { return d.new_cases; }),
+            avg_new_cases_per_mil: d3.mean(v, function(d) { return d.new_cases_per_mil; })
+        };
+    })
+    .entries(filteredData)
+    .map(function(group) {
+        return {
+            location: group.key,
+            avg_new_cases: Math.round(group.value.avg_new_cases),
+            avg_new_cases_per_mil: Math.round(group.value.avg_new_cases_per_mil)
+        }
+    });
+
+    // group filteredDataPast by location and mean values
+    var dataPast = d3.nest()
+    .key(function(d) { return d.location; })
+    .rollup(function(v) { 
+        return {
+            avg_new_cases_past: d3.mean(v, function(d) { return d.new_cases; }),
+            avg_new_cases_per_mil_past: d3.mean(v, function(d) { return d.new_cases_per_mil; })
+        };
+    })
+    .entries(filteredDataPast)
+    .map(function(group) {
+        return {
+            location: group.key,
+            avg_new_cases_past: Math.round(group.value.avg_new_cases_past),
+            avg_new_cases_per_mil_past: Math.round(group.value.avg_new_cases_per_mil_past)
+        }
+    });
     
+    // left join function used to join data & dataPast
+    function equijoinWithDefault(xs, ys, primary, foreign, sel, def) {
+        const iy = ys.reduce((iy, row) => iy.set(row[foreign], row), new Map);
+        return xs.map(row => typeof iy.get(row[primary]) !== 'undefined' ? sel(row, iy.get(row[primary])): sel(row, def));
+    };
+
+    // left join lookup data & dataPast on date
+    const data = equijoinWithDefault(
+        dataCurr, dataPast, 
+        "location", "location", 
+        ({location, avg_new_cases, avg_new_cases_per_mil}, {avg_new_cases_past, avg_new_cases_per_mil_past}, ) => 
+        ({location, avg_new_cases, avg_new_cases_per_mil, avg_new_cases_past, avg_new_cases_per_mil_past}), 
+        {avg_new_cases_past:null, avg_new_cases_per_mil_past:null});
+
+    getData(selMetric);
+
+    function getData() {
+        for(var i = 0; i < data.length; i++) {
+            if(selMetric == 'actual') {
+                var metric = parseInt(data[i].avg_new_cases).toLocaleString("en");
+                var metricPast = parseInt(data[i].avg_new_cases_past).toLocaleString("en");
+                var cycleDuration = cycleCalc(data[i].avg_new_cases);
+            } else {
+                var metric = parseInt(data[i].avg_new_cases_per_mil).toLocaleString("en");
+                var metricPast = parseInt(data[i].avg_new_cases_per_mil_past).toLocaleString("en");
+                var cycleDuration = cycleCalc(data[i].avg_new_cases_per_mil);
+            }
+            var location = data[i].location;
+            addChart(location, metric, metricPast, cycleDuration);
+        }
+    }
+
+    function cycleCalc(value) {
+        if(Math.round(value) < 1) {
+            cases = 1; 
+        } else {
+            cases = value;
+        }
+        // 24 hours = 86400000 ms
+        // cases to duration eg smaller duration is faster
+        cycleDuration = (1 / cases) * 86400000;
+        return cycleDuration
+    }
+        
     $("#btn_sort").click(function () {
         d3.selectAll('svg').remove();
         var x = document.getElementById("btn_sort");
@@ -55,73 +172,7 @@ d3.csv("owid-covid-data.csv", function(d) {
         getData();
     });
 
-    // filter rawData
-    var cutoffDate = new Date();
-    contFilter = '';
-    cutoffDate.setDate(cutoffDate.getDate() - 8);
-    if(contFilter == '') {
-        filteredData = rawData.filter(function(d) {
-            return d.date > cutoffDate && d.location !== 'International';
-        })
-    } else {
-        filteredData = rawData.filter(function(d) {
-            return d.date > cutoffDate && d.location !== 'International' && d.continent == contFilter;
-        })
-    }
-
-    // get min and max date to write to index
-    minDate = d3.min(filteredData.map(d=>d.date));
-    maxDate = d3.max(filteredData.map(d=>d.date));
-    document.getElementById("min_date").innerHTML += minDate.toISOString().split("T")[0];
-    document.getElementById("max_date").innerHTML += maxDate.toISOString().split("T")[0];
-
-    // group filteredData by location and mean values
-    var data = d3.nest()
-    .key(function(d) { return d.location; })
-    .rollup(function(v) { 
-        return {
-            avg_new_cases: d3.mean(v, function(d) { return d.new_cases; }),
-            avg_new_cases_per_mil: d3.mean(v, function(d) { return d.new_cases_per_mil; })
-        };
-    })
-    .entries(filteredData)
-    .map(function(group) {
-        return {
-            location: group.key,
-            avg_new_cases: group.value.avg_new_cases,
-            avg_new_cases_per_mil: group.value.avg_new_cases_per_mil
-        }
-    });
-
-    getData(selMetric);
-
-    function getData() {
-        for(var i = 0; i < data.length; i++) {
-            if(selMetric == 'actual') {
-                var metric = parseInt(data[i].avg_new_cases).toLocaleString("en");
-                var cycleDuration = cycleCalc(data[i].avg_new_cases);
-            } else {
-                var metric = parseInt(data[i].avg_new_cases_per_mil).toLocaleString("en");
-                var cycleDuration = cycleCalc(data[i].avg_new_cases_per_mil);
-            }
-            var location = data[i].location;
-            addChart(location, metric, cycleDuration);
-        }
-    }
-
-    function cycleCalc(value) {
-        if(Math.round(value) < 1) {
-            cases = 1; 
-        } else {
-            cases = value;
-        }
-        // 24 hours = 86400000 ms
-        // cases to duration eg smaller duration is faster
-        cycleDuration = (1 / cases) * 86400000;
-        return cycleDuration
-    }
-
-    function addChart(location, metric, cycleDuration) {
+    function addChart(location, metric, metricPast, cycleDuration) {
         var width = 700;
         var height = 20;
         var yText = height / 1.3;
@@ -156,7 +207,17 @@ d3.csv("owid-covid-data.csv", function(d) {
 
         // create svg shape
         var svgShape = svgContainer.append("circle")
-        .style("fill", "#FFF")
+        .style("stroke", "FFF")
+       	.style("stroke-width", 2)
+        .style("fill", function(d) { 
+            if(metric < metricPast) {
+                return "#6FC628";
+            } else if (metric > metricPast) {
+                return "#C62858";
+            } else {
+                return "#FFF";
+            }
+        })
         .attr("cy", yShape)
         .attr("r", 5);
 
