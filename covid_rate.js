@@ -36,7 +36,7 @@ d3.csv("owid-covid-data.csv", function(d) {
         })
     } else {
         filteredDataPast = rawData.filter(function(d) {
-            return d.date > cutOffDate14days && d.date < cutOffDate !== 'International' && d.continent == contFilter;
+            return d.date > cutOffDate14days && d.date < cutOffDate && d.location !== 'International' && d.continent == contFilter;
         })
     }
 
