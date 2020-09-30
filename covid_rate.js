@@ -1,5 +1,4 @@
 
-
 var parseTime = d3.timeParse("%Y-%m-%d");
 var selMetric = 'actual';
 var contFilter = ''; // not implemented but continent filter in future
@@ -50,6 +49,7 @@ d3.csv("owid-covid-data.csv", function(d) {
     maxDate = d3.max(filteredData.map(d=>d.date));
     document.getElementById("min_date").innerHTML += minDate.toISOString().split("T")[0];
     document.getElementById("max_date").innerHTML += maxDate.toISOString().split("T")[0];
+    
 
     // group filteredData by location and mean values
     var dataCurr = d3.nest()
