@@ -15,38 +15,23 @@ d3.csv("owid-covid-data.csv", function(d) {
 
     // filter rawData past 7 days
     var maxAvailDate = d3.max(rawData.map(d=>d.date));
-    var cutOffDate = new Date();
-    cutOffDate.setDate(maxAvailDate.getDate() - 7);
-    if(contFilter == '') {
-        filteredData = rawData.filter(function(d) {
-            return d.date > cutOffDate && d.location !== 'International';
-        })
-    } else {
-        filteredData = rawData.filter(function(d) {
-            return d.date > cutOffDate && d.location !== 'International' && d.continent == contFilter;
-        })
-    }
+    var cutOffDate = new Date(maxAvailDate);
+    cutOffDate.setDate(cutOffDate.getDate()-7);
+    filteredData = rawData.filter(function(d) {
+        return d.date > cutOffDate && d.location !== 'International';
+    })
 
     // filter rawData past 14 to 7 days (from maxAvailDate - 14 to maxAvailDate - 7)
-    var cutOffDate14days = new Date();
-    cutOffDate14days.setDate(maxAvailDate.getDate() - 14);
-    if(contFilter == '') {
-        filteredDataPast = rawData.filter(function(d) {
-            return d.date > cutOffDate14days &&  d.date < cutOffDate && d.location !== 'International';
-        })
-    } else {
-        filteredDataPast = rawData.filter(function(d) {
-            return d.date > cutOffDate14days && d.date < cutOffDate && d.location !== 'International' && d.continent == contFilter;
-        })
-    }
-
-    // get min and max date to write to index
-    //minDatePast = d3.min(filteredDataPast.map(d=>d.date));
-    //maxDatePast = d3.max(filteredDataPast.map(d=>d.date));
+    var cutOffDate14days = new Date(maxAvailDate);
+    cutOffDate14days.setDate(cutOffDate14days.getDate() - 14);
+    filteredDataPast = rawData.filter(function(d) {
+        return d.date > cutOffDate14days &&  d.date < cutOffDate && d.location !== 'International';
+    })
 
     // get min and max date to write to index
     minDate = d3.min(filteredData.map(d=>d.date));
     maxDate = d3.max(filteredData.map(d=>d.date));
+
     document.getElementById("min_date").innerHTML += minDate.toISOString().split("T")[0];
     document.getElementById("max_date").innerHTML += maxDate.toISOString().split("T")[0];
     
