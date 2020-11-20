@@ -192,7 +192,7 @@ d3.csv("owid-covid-data.csv", function(d) {
 
         // create svg shape
         var svgShape = svgContainer.append("circle")
-        .style("stroke", "FFF")
+        .style("stroke", "#FFF")
        	.style("stroke-width", 2)
         .style("fill", function(d) { 
             if(metric < metricPast) {
