@@ -3,7 +3,9 @@ var parseTime = d3.timeParse("%Y-%m-%d");
 var selMetric = 'actual';
 var contFilter = ''; // not implemented but continent filter in future
 
-d3.csv("owid-covid-data.csv", function(d) {
+var file_owid = "https://raw.githubusercontent.com/owid/COVID-19-data/master/public/data/owid-covid-data.csv";
+
+d3.csv(file_owid, function(d) {
     return {
         location: d.location,
         continent: d.continent,
